@@ -1,0 +1,28 @@
+{
+  "name": "sir-factory",
+  "version": "0.2.0",
+  "description": "SIR verified-recompose build orchestrator — a mechanical CLI (install → stamp → grade → pack) driven by the sir-factory-runner agent. No API key, no claude -p. Targets SIR Schema v0.2.",
+  "type": "module",
+  "bin": {
+    "sir-factory": "./factory.mjs"
+  },
+  "files": [
+    "factory.mjs",
+    "lib/",
+    "roles/",
+    "PROTOCOL.md"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "license": "MIT",
+  "homepage": "https://rederive.ai",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/rederive/sir-factory.git"
+  },
+  "keywords": ["sir", "verified-recompose", "decompile", "oracle", "rederive", "supply-chain"],
+  "publishConfig": {
+    "access": "public"
+  }
+}
