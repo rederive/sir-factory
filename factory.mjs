@@ -144,7 +144,7 @@ async function doGrade() {
   st.set(meta.name, { status: 'hardening', round, quorum: `${g.fullCount}/${g.emitted}`, lastDivergence: summary });
   console.log(`KICK BACK SIR (round ${round}/${cap}): ${summary}`);
   console.log(`divergence -> ${join(wd, 'divergence.json')}`);
-  console.log(`next: re-spawn the decomposer in HARDEN mode with ${join(wd, meta.sir)} + divergence.json, then re-stamp, re-emit, and: node factory.mjs grade <wd> --round ${round + 1}`);
+  console.log(`next: re-spawn the decomposer in HARDEN mode with ${join(wd, meta.sir)} + divergence.json, then re-stamp, re-emit, and: sir-factory grade <wd> --round ${round + 1}`);
   process.exitCode = 2; // 0=verified, 2=needs-hardening (loop), 1=terminal/quarantine
 }
 
@@ -223,6 +223,6 @@ function doStageReemit() {
     ok: true, cleanRoom: cr,
     sirPath: join(cr, `${unit}.sir`), frozenPath: join(cr, 'frozen.md'),
     exportName: oracle.exportName, emitTo: join(wd, 'runs', 'emit_<i>.mjs'), carriedImport,
-    next: `spawn N sir-reemitter-cr agents (subagent_type 'sir-reemitter-cr'): each READS the two paths above${carriedImport ? ' and imports the carried constants' : ''}, reconstructs ${unit}, and writes ${join(wd, 'runs', 'emit_<i>.mjs')} (distinct i). Then: node factory.mjs grade ${wd} --round <r>`,
+    next: `spawn N sir-reemitter-cr agents (subagent_type 'sir-reemitter-cr'): each READS the two paths above${carriedImport ? ' and imports the carried constants' : ''}, reconstructs ${unit}, and writes ${join(wd, 'runs', 'emit_<i>.mjs')} (distinct i). Then: sir-factory grade ${wd} --round <r>`,
   }, null, 2));
 }
