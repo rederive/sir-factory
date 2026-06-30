@@ -77,7 +77,10 @@ async function doStamp() {
   const traceMode = /ORACLE-CLASS\s+trace|TRACE-SEAM/i.test(sirText);
   const ndm = sirText.match(/ORACLE-CLASS\s+non-deterministic[^\n]*/i);
   if (!traceMode && ndm) { st.set(meta.name, { status: 'quarantined', reason: ndm[0].trim() }); return fail('QUARANTINE: ' + ndm[0].trim() + ' — needs an injected-seam oracle (trace mode), not value mode'); }
-  const realFn = loadRealExport(meta.installDir, meta.name, meta.exportName);
+  // SEAM (declared in the SIR): how to drive a NON-callable real export — `index` (data object → indexer) or
+  // `builder` (constructor → method-chain adapter). Pure navigation of the real package; absent = call directly.
+  const seam = sirText.match(/^SEAM\s+(\w+)/mi)?.[1];
+  const realFn = loadRealExport(meta.installDir, meta.name, meta.exportName, seam);
   if (typeof realFn !== 'function') { st.set(meta.name, { status: 'quarantined', reason: 'could not load real export' }); return fail('could not load real export'); }
   const frozenN = Number(opt('--frozen', 16)), heldoutN = Number(opt('--heldout', 13)), seed = Number(opt('--seed', 0x9e3779b9));
   let stamped;
@@ -104,8 +107,10 @@ async function doGrade() {
   const meta = JSON.parse(readFileSync(join(wd, 'meta.json'), 'utf8'));
   const oracle = JSON.parse(readFileSync(join(wd, 'oracle.json'), 'utf8'));
   const inputsPath = join(wd, meta.inputs);
-  const kind = (existsSync(join(wd, meta.sir)) && readFileSync(join(wd, meta.sir), 'utf8').match(/^KIND\s+(\w+)/m)?.[1]) || 'FUNCTIONAL'; // STATE-aware, aliasing-free differential
-  const realFn = loadRealExport(meta.installDir, meta.name, meta.exportName);
+  const gSirText = existsSync(join(wd, meta.sir)) ? readFileSync(join(wd, meta.sir), 'utf8') : '';
+  const kind = gSirText.match(/^KIND\s+(\w+)/m)?.[1] || 'FUNCTIONAL'; // STATE-aware, aliasing-free differential
+  const seam = gSirText.match(/^SEAM\s+(\w+)/mi)?.[1];
+  const realFn = loadRealExport(meta.installDir, meta.name, meta.exportName, seam);
   const emissionPaths = readdirSync(join(wd, 'runs')).filter((f) => /^emit_.*\.mjs$/.test(f)).map((f) => join(wd, 'runs', f));
   if (emissionPaths.length < 2) { st.set(meta.name, { status: 'quarantined', reason: `only ${emissionPaths.length} emission(s)` }); return fail(`only ${emissionPaths.length} emission(s) — cannot reach quorum`); }
   const diffN = Number(opt('--differential', 400)), seed = Number(opt('--seed', 0x9e3779b9));
