@@ -15,13 +15,20 @@
   "engines": {
     "node": ">=18"
   },
-  "license": "MIT",
+  "license": "Apache-2.0",
   "homepage": "https://rederive.ai",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/rederive/sir-factory.git"
   },
-  "keywords": ["sir", "verified-recompose", "decompile", "oracle", "rederive", "supply-chain"],
+  "keywords": [
+    "sir",
+    "verified-recompose",
+    "decompile",
+    "oracle",
+    "rederive",
+    "supply-chain"
+  ],
   "publishConfig": {
     "access": "public"
   }
