@@ -13,7 +13,8 @@ import { mkdirSync, writeFileSync, readFileSync, existsSync, readdirSync, copyFi
 import { join, dirname, resolve, basename } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { installPackage, loadRealExport, cleanup } from './lib/pkg.mjs';
-import { stampOracle, stampTraceOracle } from './lib/oracle.mjs';
+import { stampOracle, stampTraceOracle, coverageGate } from './lib/oracle.mjs';
+import { extendOracle } from './lib/extend.mjs';
 import { grade } from './lib/grade.mjs';
 import { display, encode } from './lib/codec.mjs';
 import { packPackage } from './lib/pack.mjs';
@@ -42,7 +43,16 @@ else if (cmd === 'status') doStatus();
 else if (cmd === 'extract') doExtract();
 else if (cmd === 'stage-reemit') doStageReemit();
 else if (cmd === 'pack') doPack();
-else { console.error('usage: factory.mjs <install|decompose*|extract|stamp|grade|pack|status> ...'); process.exit(2); }
+else if (cmd === 'extend') {
+  // extend <pkgdir> --inputs <module.mjs> [--dry-run] — harden a SHIPPED oracle from the upstream original.
+  // Inputs only (never expecteds); appended to held-out; caller re-runs `rdv check` after.
+  try {
+    const r = await extendOracle({ pkgDir: resolve(pos[0]), inputsPath: resolve(opt('--inputs', '')), dryRun: argv.includes('--dry-run') });
+    console.log(`extend: +${r.added} held-out vectors (${r.skipped} duplicates skipped)${r.heldoutNow ? `, held-out now ${r.heldoutNow}` : ''}${r.upstream ? ` — stamped from ${r.upstream}` : ''}${r.note ? ` (${r.note})` : ''}`);
+    console.log('now RE-VERIFY the shipped src against the fattened oracle:  rdv check ' + pos[0]);
+  } catch (e) { fail('extend failed: ' + e.message); }
+}
+else { console.error('usage: factory.mjs <install|decompose*|extract|stamp|grade|pack|extend|status> ...'); process.exit(2); }
 
 function doInstall() {
   const [name, version] = pos;
@@ -88,6 +98,15 @@ async function doStamp() {
   try { stamped = await (traceMode ? stampTraceOracle : stampOracle)({ inputsPath, realFn, frozenN, heldoutN, rnd: mulberry(seed), kind }); }
   catch (e) { st.set(meta.name, { status: 'quarantined', reason: 'stamp failed: ' + e.message }); return fail('stamp failed: ' + e.message); }
   if (stamped.leak > 0) { st.set(meta.name, { status: 'quarantined', reason: `held-out leakage ${stamped.leak}` }); return fail(`held-out leakage ${stamped.leak} — train/test not disjoint`); }
+  // ORACLE COVERAGE GATE (v1): refuse to ship an oracle thinner than the SIR's own declared surface.
+  if (!argv.includes('--skip-coverage-gate')) {
+    const gate = coverageGate(sirText, [...stamped.oracle.frozen, ...stamped.oracle.heldout]);
+    if (!gate.ok) {
+      st.set(meta.name, { status: 'quarantined', reason: 'coverage gate: ' + gate.failures.join('; ') });
+      return fail('COVERAGE GATE FAILED — the oracle does not exercise the SIR\'s declared surface:\n  - ' +
+        gate.failures.join('\n  - ') + '\n  Fix the inputs generator (do NOT skip the gate to pass).');
+    }
+  }
   const oracle = stamped.oracle;
   writeFileSync(join(wd, 'oracle.json'), JSON.stringify(oracle, null, 2) + '\n');
   st.set(meta.name, { status: 'reemitting' });
