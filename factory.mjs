@@ -13,8 +13,8 @@ import { mkdirSync, writeFileSync, readFileSync, existsSync, readdirSync, copyFi
 import { join, dirname, resolve, basename } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { installPackage, loadRealExport, cleanup } from './lib/pkg.mjs';
-import { stampOracle, stampTraceOracle, coverageGate } from './lib/oracle.mjs';
-import { extendOracle } from './lib/extend.mjs';
+import { stampOracle, stampTraceOracle, coverageGate, heldoutStrengthGate } from './lib/oracle.mjs';
+import { extendOracle, rebalanceHeldout } from './lib/extend.mjs';
 import { grade } from './lib/grade.mjs';
 import { display, encode } from './lib/codec.mjs';
 import { packPackage } from './lib/pack.mjs';
@@ -52,7 +52,19 @@ else if (cmd === 'extend') {
     console.log('now RE-VERIFY the shipped src against the fattened oracle:  rdv check ' + pos[0]);
   } catch (e) { fail('extend failed: ' + e.message); }
 }
-else { console.error('usage: factory.mjs <install|decompose*|extract|stamp|grade|pack|extend|status> ...'); process.exit(2); }
+else if (cmd === 'rebalance') {
+  // rebalance <pkgdir> [--candidates <mod.mjs>] [--per-class N] [--dry-run] — stratify a shipped held-out set so
+  // it kills a constant stub (QA gate ② backfill). Inputs only; expecteds stamped from the upstream original.
+  try {
+    const r = await rebalanceHeldout({ pkgDir: resolve(pos[0]), candidatesPath: opt('--candidates') ? resolve(opt('--candidates', '')) : null,
+      perClass: parseInt(opt('--per-class', '4'), 10), dryRun: argv.includes('--dry-run') });
+    console.log(`rebalance ${r.status}: held-out ${r.oldHeldout}→${r.newHeldout}, output classes ${r.oldClasses}→${r.newClasses}` +
+      ` (labeled ${r.poolLabeled} from upstream ${r.upstream}${r.candidatesUsed ? `, +${r.candidatesUsed} candidates` : ''})${r.note ? ` — ${r.note}` : ''}`);
+    if (r.status === 'OK') console.log('now RE-VERIFY:  rdv check ' + pos[0]);
+    else process.exitCode = 1;
+  } catch (e) { fail('rebalance failed: ' + e.message); }
+}
+else { console.error('usage: factory.mjs <install|decompose*|extract|stamp|grade|pack|extend|rebalance|status> ...'); process.exit(2); }
 
 function doInstall() {
   const [name, version] = pos;
@@ -105,6 +117,14 @@ async function doStamp() {
       st.set(meta.name, { status: 'quarantined', reason: 'coverage gate: ' + gate.failures.join('; ') });
       return fail('COVERAGE GATE FAILED — the oracle does not exercise the SIR\'s declared surface:\n  - ' +
         gate.failures.join('\n  - ') + '\n  Fix the inputs generator (do NOT skip the gate to pass).');
+    }
+    // HELD-OUT ANTI-OVERFIT GATE (v2): the held-out slice must be able to kill a constant stub.
+    const hg = heldoutStrengthGate(stamped.oracle.heldout);
+    if (!hg.ok) {
+      st.set(meta.name, { status: 'quarantined', reason: 'held-out strength: ' + hg.why });
+      return fail(`HELD-OUT STRENGTH GATE ${hg.verdict} — ${hg.why}.\n  The held-out set must be output-stratified` +
+        ' (both classes for a boolean; span the output range otherwise). Fix the inputs generator to sample' +
+        ' balanced classes into held-out — do NOT skip the gate to pass.');
     }
   }
   const oracle = stamped.oracle;
