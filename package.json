@@ -1,6 +1,6 @@
 {
   "name": "sir-factory",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "SIR verified-recompose build orchestrator — a mechanical CLI (install → stamp → grade → pack) driven by the sir-factory-runner agent. No API key, no claude -p. Targets SIR Schema v0.2.",
   "type": "module",
   "bin": {
